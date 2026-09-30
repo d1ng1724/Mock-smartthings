@@ -1,0 +1,8 @@
+server:
+  port: ${PORT:8080}
+
+mock:
+  # 상태 갱신 주기(ms). 이 주기마다 run 중인 기기의 남은시간이 줄어든다.
+  tick-ms: ${MOCK_TICK_MS:1000}
+  # tick 한 번에 줄어드는 "분". 기본 1 → 60분 사이클이 60초 만에 끝난다(테스트용 가속).
+  minutes-per-tick: ${MOCK_MINUTES_PER_TICK:1}

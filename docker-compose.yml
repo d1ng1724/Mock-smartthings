@@ -1,0 +1,20 @@
+services:
+  mock-smartthings:
+    build: .
+    container_name: mock-smartthings
+    ports:
+      - "8080:8080"
+    environment:
+      # tick 한 번에 줄어드는 분. 크게 하면 사이클이 더 빨리 끝난다.
+      - MOCK_MINUTES_PER_TICK=1
+      - MOCK_TICK_MS=1000
+
+  # 관리 프로그램도 같은 compose 로 띄운다면 아래처럼 붙여서
+  # SMARTTHINGS_API_URL 만 http://mock-smartthings:8080 으로 바꿔주면 된다.
+  #
+  # your-manager:
+  #   build: ../your-manager
+  #   depends_on: [mock-smartthings]
+  #   environment:
+  #     - SMARTTHINGS_API_URL=http://mock-smartthings:8080
+  #     - SMARTTHINGS_PAT=dummy-token
