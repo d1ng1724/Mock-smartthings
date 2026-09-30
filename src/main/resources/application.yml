@@ -6,3 +6,10 @@ mock:
   tick-ms: ${MOCK_TICK_MS:1000}
   # tick 한 번에 줄어드는 "분". 기본 1 → 60분 사이클이 60초 만에 끝난다(테스트용 가속).
   minutes-per-tick: ${MOCK_MINUTES_PER_TICK:1}
+  # 완료(finish/finished) 상태를 유지하는 시간(초). 이후 jobState 가 none 으로 돌아간다.
+  finish-hold-seconds: ${MOCK_FINISH_HOLD_SECONDS:30}
+  # lenient: Authorization 헤더만 있으면 통과 / strict: 목이 발급한 토큰만 통과(만료되면 401)
+  token-validation: ${MOCK_TOKEN_VALIDATION:lenient}
+  oauth:
+    # 발급 토큰 유효 시간(초). 짧게 주면 관리 프로그램의 갱신 스케줄러를 빨리 돌려볼 수 있다.
+    expires-in-seconds: ${MOCK_OAUTH_EXPIRES_IN:3600}

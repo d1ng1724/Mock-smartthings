@@ -1,13 +1,10 @@
 package com.example.mockst.web;
 
-import com.example.mockst.model.MockDevice;
 import com.example.mockst.store.DeviceStore;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /** 서버가 떴는지 확인하는 용도 (토큰 없이 접근 가능). */
@@ -22,18 +19,15 @@ public class RootController {
 
     @GetMapping("/")
     public Map<String, Object> index() {
-        List<Map<String, Object>> ds = new ArrayList<>();
-        for (MockDevice d : store.all()) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("deviceId", d.deviceId);
-            m.put("type", d.type.name());
-            m.put("label", d.label);
-            ds.add(m);
-        }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("service", "mock-smartthings");
         out.put("status", "up");
-        out.put("devices", ds);
+        out.put("deviceCount", store.all().size());
+        out.put("endpoints", Map.of(
+                "devices", "/v1/devices",
+                "oauthAuthorize", "/oauth/authorize",
+                "oauthToken", "/oauth/token",
+                "mockConsole", "/mock/devices"));
         return out;
     }
 }

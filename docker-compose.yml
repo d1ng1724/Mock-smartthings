@@ -8,13 +8,21 @@ services:
       # tick 한 번에 줄어드는 분. 크게 하면 사이클이 더 빨리 끝난다.
       - MOCK_MINUTES_PER_TICK=1
       - MOCK_TICK_MS=1000
+      # 완료 상태를 몇 초 유지한 뒤 jobState 를 none 으로 되돌릴지
+      - MOCK_FINISH_HOLD_SECONDS=30
+      # lenient | strict
+      - MOCK_TOKEN_VALIDATION=lenient
+      - MOCK_OAUTH_EXPIRES_IN=3600
 
-  # 관리 프로그램도 같은 compose 로 띄운다면 아래처럼 붙여서
-  # SMARTTHINGS_API_URL 만 http://mock-smartthings:8080 으로 바꿔주면 된다.
+  # 관리 프로그램(Washer-Backend-v2)도 같은 compose 로 띄운다면 아래처럼 붙인다.
   #
-  # your-manager:
-  #   build: ../your-manager
+  # washer-backend:
+  #   build: ../Washer-Backend-v2
   #   depends_on: [mock-smartthings]
   #   environment:
   #     - SMARTTHINGS_API_URL=http://mock-smartthings:8080
-  #     - SMARTTHINGS_PAT=dummy-token
+  #     - SMARTTHINGS_OAUTH_URL=http://mock-smartthings:8080/oauth/token
+  #     - SMARTTHINGS_AUTHORIZE_URL=http://mock-smartthings:8080/oauth/authorize
+  #     - SMARTTHINGS_CLIENT_ID=mock-client
+  #     - SMARTTHINGS_CLIENT_SECRET=mock-secret
+  #     - SMARTTHINGS_TUB_CLEAN_CYCLE=6C

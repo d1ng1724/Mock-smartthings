@@ -79,8 +79,7 @@ public class DeviceController {
     }
 
     private ResponseEntity<Map<String, Object>> notFound() {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                Map.of("requestId", "mock",
-                        "error", Map.of("code", "NotFoundError", "message", "Device not found")));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiErrors.body("NotFoundError", "Device not found"));
     }
 }
