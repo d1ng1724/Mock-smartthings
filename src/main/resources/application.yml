@@ -13,3 +13,13 @@ mock:
   oauth:
     # 발급 토큰 유효 시간(초). 짧게 주면 관리 프로그램의 갱신 스케줄러를 빨리 돌려볼 수 있다.
     expires-in-seconds: ${MOCK_OAUTH_EXPIRES_IN:3600}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    # 태그(SmartThings Devices → OAuth → Mock 조작 → Health)와 메서드 순으로 정렬
+    tags-sorter: alpha
+    operations-sorter: method
+    display-request-duration: true
+  # 기기 API 는 /v1/devices 와 /devices 를 둘 다 받지만, 문서에는 /v1 쪽만 싣는다.
+  paths-to-exclude: /devices, /devices/**

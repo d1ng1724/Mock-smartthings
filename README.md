@@ -30,6 +30,18 @@ mvn spring-boot:run
 curl http://localhost:8080/
 ```
 
+## Swagger UI
+
+브라우저에서 **<http://localhost:8080/swagger-ui.html>** 를 열면 모든 엔드포인트를 바로 호출해 볼 수 있다.
+OpenAPI 문서 자체는 <http://localhost:8080/v3/api-docs> 에 있다.
+
+- 기기 API 는 토큰이 필요하다. 우측 상단 **Authorize** 를 눌러 아무 값이나 넣으면 된다
+  (`lenient` 모드 기준. `strict` 모드라면 `POST /oauth/token` 으로 받은 access token 을 넣는다).
+- `POST /v1/devices/{id}/commands` 에는 **가동 / 정지 / 무세제 통세척 / 전원 끄기** 예제가 들어 있어서
+  드롭다운에서 고르기만 하면 된다.
+- `deviceId` 는 `GET /mock/devices` 에서 라벨과 함께 볼 수 있다.
+- 기기 API 는 `/v1/devices` 와 `/devices` 둘 다 받지만, 문서에는 `/v1` 쪽만 싣는다(중복 제거).
+
 ## 관리 프로그램에 붙이는 법
 
 환경변수 5개만 바꾸면 된다.

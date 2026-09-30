@@ -5,6 +5,10 @@ import com.example.mockst.store.DeviceStore;
 import com.example.mockst.web.dto.CommandDto;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +22,7 @@ import java.util.*;
  */
 @RestController
 @RequestMapping({"/v1/devices", "/devices"})
+@Tag(name = "SmartThings Devices")
 public class DeviceController {
 
     private final DeviceStore store;
@@ -29,6 +34,9 @@ public class DeviceController {
     }
 
     /** GET /v1/devices — 기기 목록 */
+    @Operation(summary = "기기 목록",
+            description = "등록된 가상 기기 전체를 SmartThings 형식으로 돌려준다. "
+                    + "관리 프로그램은 여기서 label 을 읽어 Machine 을 만든다.")
     @GetMapping("")
     public Map<String, Object> list() {
         List<Map<String, Object>> items = new ArrayList<>();
@@ -39,6 +47,7 @@ public class DeviceController {
     }
 
     /** GET /v1/devices/{id} — 기기 상세 */
+    @Operation(summary = "기기 상세", description = "deviceId 는 `GET /mock/devices` 에서 라벨과 함께 확인할 수 있다.")
     @GetMapping("/{id}")
     public ResponseEntity<?> get(@PathVariable String id) {
         MockDevice d = store.get(id);
@@ -46,6 +55,14 @@ public class DeviceController {
     }
 
     /** GET /v1/devices/{id}/status — 전체 컴포넌트/기능 상태 */
+    @Operation(summary = "기기 상태",
+            description = """
+                    `components.main.<capability>.<attribute>.{value,timestamp,unit}` 형태.
+
+                    관리 프로그램이 읽는 것은 `switch`, `washerOperatingState`/`dryerOperatingState`,
+                    `remoteControlStatus` 세 가지다. `timestamp` 는 조회 시각이 아니라
+                    **값이 바뀐 시각**이므로 상태 변화 감지에 그대로 쓸 수 있다.
+                    """)
     @GetMapping("/{id}/status")
     public ResponseEntity<?> status(@PathVariable String id) {
         MockDevice d = store.get(id);
@@ -53,6 +70,7 @@ public class DeviceController {
     }
 
     /** GET /v1/devices/{id}/health — ONLINE/OFFLINE */
+    @Operation(summary = "기기 온·오프라인", description = "`POST /mock/devices/{id}/online` 으로 값을 바꿀 수 있다.")
     @GetMapping("/{id}/health")
     public ResponseEntity<?> health(@PathVariable String id) {
         MockDevice d = store.get(id);
@@ -60,6 +78,31 @@ public class DeviceController {
     }
 
     /** POST /v1/devices/{id}/commands — 명령 실행 */
+    @Operation(summary = "명령 실행",
+            description = """
+                    실제 API 와 마찬가지로 **기기가 받아들이지 못하는 명령도 `ACCEPTED`** 로 응답하고
+                    상태만 바뀌지 않는다. 원격 제어가 꺼진 기기는 전원 외의 명령을 무시한다.
+                    """,
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
+                    content = @Content(mediaType = "application/json", examples = {
+                            @ExampleObject(name = "가동 (세탁기)", value = """
+                                    {"commands":[{"component":"main","capability":"washerOperatingState",\
+                                    "command":"setMachineState","arguments":["run"]}]}"""),
+                            @ExampleObject(name = "정지 (세탁기)", value = """
+                                    {"commands":[{"component":"main","capability":"washerOperatingState",\
+                                    "command":"setMachineState","arguments":["stop"]}]}"""),
+                            @ExampleObject(name = "무세제 통세척 (코스 지정 후 가동)", value = """
+                                    {"commands":[\
+                                    {"component":"main","capability":"samsungce.washerCycle",\
+                                    "command":"setWasherCycle","arguments":["6C"]},\
+                                    {"component":"main","capability":"washerOperatingState",\
+                                    "command":"setMachineState","arguments":["run"]}]}"""),
+                            @ExampleObject(name = "전원 끄기", value = """
+                                    {"commands":[{"component":"main","capability":"switch",\
+                                    "command":"off","arguments":[]}]}"""),
+                            @ExampleObject(name = "가동 (건조기)", value = """
+                                    {"commands":[{"component":"main","capability":"dryerOperatingState",\
+                                    "command":"setMachineState","arguments":["run"]}]}""")})))
     @PostMapping("/{id}/commands")
     public ResponseEntity<?> commands(@PathVariable String id, @RequestBody JsonNode body) {
         MockDevice d = store.get(id);

@@ -9,6 +9,8 @@ import java.util.Map;
 
 /** 서버가 떴는지 확인하는 용도 (토큰 없이 접근 가능). */
 @RestController
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Health")
+@io.swagger.v3.oas.annotations.security.SecurityRequirements
 public class RootController {
 
     private final DeviceStore store;
@@ -17,6 +19,7 @@ public class RootController {
         this.store = store;
     }
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "서버 기동 확인")
     @GetMapping("/")
     public Map<String, Object> index() {
         Map<String, Object> out = new LinkedHashMap<>();

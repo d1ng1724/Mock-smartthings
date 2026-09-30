@@ -18,6 +18,8 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/mock")
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Mock 조작")
+@io.swagger.v3.oas.annotations.security.SecurityRequirements
 public class MockAdminController {
 
     private final DeviceStore store;
@@ -31,6 +33,7 @@ public class MockAdminController {
     }
 
     /** 기기 라벨과 deviceId 목록. 어떤 기기를 조작할지 고를 때 쓴다. */
+    @io.swagger.v3.oas.annotations.Operation(summary = "라벨·deviceId·현재 상태 한눈에 보기")
     @GetMapping("/devices")
     public List<Map<String, Object>> devices() {
         List<Map<String, Object>> list = new ArrayList<>();
@@ -51,6 +54,7 @@ public class MockAdminController {
     }
 
     /** 모든 기기를 초기 상태로 되돌린다. */
+    @io.swagger.v3.oas.annotations.Operation(summary = "모든 기기를 초기 상태로 되돌린다")
     @PostMapping("/reset")
     public Map<String, Object> reset() {
         store.resetAll();
@@ -62,12 +66,14 @@ public class MockAdminController {
      * 다음 {@code count} 번의 기기 API 호출을 지정한 상태코드로 실패시킨다.
      * 403 은 관리 프로그램의 SmartThingsPermissionException 경로를 탄다.
      */
+    @io.swagger.v3.oas.annotations.Operation(summary = "다음 N번의 기기 API 호출을 지정한 상태코드로 실패시킨다 (403=권한오류 경로, 500=재시도 경로)")
     @PostMapping("/fail")
     public Map<String, Object> fail(@RequestParam int status, @RequestParam(defaultValue = "1") int count) {
         faults.queue(status, count);
         return Map.of("status", status, "remaining", faults.remaining());
     }
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "장애 주입 해제")
     @DeleteMapping("/fail")
     public Map<String, Object> clearFail() {
         faults.clear();
@@ -75,6 +81,7 @@ public class MockAdminController {
     }
 
     /** 원격 제어(Smart Control) 스위치. 끄면 전원 외의 제어 명령이 무시된다. */
+    @io.swagger.v3.oas.annotations.Operation(summary = "원격 제어(Smart Control) 스위치. 끄면 전원 외의 명령이 무시된다")
     @PostMapping("/devices/{id}/remote-control")
     public ResponseEntity<?> remoteControl(@PathVariable String id, @RequestParam boolean enabled) {
         MockDevice d = store.get(id);
@@ -86,6 +93,7 @@ public class MockAdminController {
     }
 
     /** 기기 온·오프라인. /v1/devices/{id}/health 응답에 반영된다. */
+    @io.swagger.v3.oas.annotations.Operation(summary = "기기 온·오프라인 전환")
     @PostMapping("/devices/{id}/online")
     public ResponseEntity<?> online(@PathVariable String id, @RequestParam boolean value) {
         MockDevice d = store.get(id);
@@ -97,6 +105,7 @@ public class MockAdminController {
     }
 
     /** 발급된 access token 을 전부 만료시킨다. strict 모드에서 갱신 스케줄러를 테스트할 때 쓴다. */
+    @io.swagger.v3.oas.annotations.Operation(summary = "발급된 access token 을 전부 즉시 만료시킨다")
     @PostMapping("/tokens/expire")
     public Map<String, Object> expireTokens() {
         return Map.of("expired", tokens.expireAll(), "issued", tokens.issuedCount());
