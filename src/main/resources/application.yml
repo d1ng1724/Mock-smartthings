@@ -16,6 +16,10 @@ mock:
   oauth:
     # 발급 토큰 유효 시간(초). 짧게 주면 관리 프로그램의 갱신 스케줄러를 빨리 돌려볼 수 있다.
     expires-in-seconds: ${MOCK_OAUTH_EXPIRES_IN:3600}
+    # true 면 모르는 refresh token 도 받아준다. 목이 재시작돼 토큰을 잃어버려도
+    # 클라이언트의 갱신 스케줄러가 스스로 복구하므로, 사람이 없는 개발 서버에 유용하다.
+    # false(기본)는 실제 OAuth 서버와 같이 400 invalid_grant 로 거절한다.
+    accept-unknown-refresh: ${MOCK_OAUTH_ACCEPT_UNKNOWN_REFRESH:false}
 
 springdoc:
   swagger-ui:

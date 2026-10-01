@@ -1,0 +1,62 @@
+# ============================================================
+#  개발(Stage) 서버용 목 SmartThings
+#
+#  배포 대상 서버에서:
+#     git clone https://github.com/d1ng1724/Mock-smartthings.git
+#     cd Mock-smartthings
+#     docker compose -f docker-compose.stage.yml up -d --build
+#
+#  [왜 network_mode: host 인가]
+#  관리 프로그램(Washer-Backend-v2)의 scripts/stage/start.sh 가
+#  washer-backend-v2 와 washer-redis 를 모두 --network host 로 띄운다.
+#  호스트 네트워크를 쓰는 컨테이너는 사용자 정의 브리지에 함께 붙을 수 없으므로,
+#  목도 같은 host 네트워크에 올려 localhost 로 통신한다.
+#
+#  [왜 SERVER_ADDRESS=127.0.0.1 인가]
+#  host 네트워크에서는 ports: 매핑이 무시되고 애플리케이션이 바인딩한 주소가 그대로 노출된다.
+#  기본값(0.0.0.0)이면 목이 서버 공인 IP로 열려 버린다. 목에는 실질적인 인증이 없으므로
+#  (토큰 값을 검사하지 않음) 반드시 루프백으로 묶어 같은 서버 안에서만 접근되게 한다.
+#     확인: ss -tlnp | grep 8081   →   127.0.0.1:8081 이어야 한다
+# ============================================================
+services:
+  mock-smartthings:
+    build: .
+    container_name: mock-smartthings
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      # 관리 프로그램이 8080 을 쓰므로 목은 8081.
+      - PORT=8081
+      # 루프백 전용 바인딩. 이 줄을 빼면 외부에 노출된다.
+      - SERVER_ADDRESS=127.0.0.1
+
+      # --- 시간 ---
+      # 개발 서버는 사람이 화면을 보며 테스트하므로 실제 시간과 같게 둔다(가속 1배).
+      # 60분 코스가 60분 걸리고, 관리 프로그램의 "N분 남음" 표시도 정상 동작한다.
+      # 빠르게 돌려보고 싶을 때만 1000 으로 낮춘다(그러면 60분 코스가 60초).
+      - MOCK_TICK_MS=60000
+      - MOCK_MINUTES_PER_TICK=1
+
+      # 완료(finish/finished) 상태 유지 시간(초). 관리 프로그램이 완료를 감지할 창.
+      - MOCK_FINISH_HOLD_SECONDS=30
+
+      # 실기기처럼 명령 반영을 조금 늦춘다. 명령 직후 상태를 확인하는 코드가
+      # 목에서만 통과하는 일을 막는다.
+      - MOCK_COMMAND_DELAY_MS=3000
+
+      # lenient: Authorization 헤더만 있으면 통과
+      # strict : 목이 발급한 유효 토큰만 통과(만료되면 401)
+      #
+      # 처음 올릴 때는 lenient 를 권한다. strict 로 두면 OAuth 를 마치기 전까지
+      # 모든 호출이 401 이 되고, IdleMachineShutdownScheduler 가 매분 실패해
+      # 로그가 지저분해진다(Discord 알림은 403 일 때만 가므로 알림 폭주는 없다).
+      # OAuth 를 끝내고 sync 까지 확인한 뒤 strict 로 바꿔 갱신 흐름을 검증하면 된다.
+      - MOCK_TOKEN_VALIDATION=lenient
+      - MOCK_OAUTH_EXPIRES_IN=3600
+
+      # 목은 발급한 토큰을 메모리에만 들고 있어서, 컨테이너가 재시작되면 전부 사라진다.
+      # 그러면 관리 프로그램 DB 의 refresh token 이 고아가 되어 19분마다 invalid_grant 가 나고
+      # 사람이 ssh 로 들어가 OAuth 를 다시 해줘야 한다.
+      # true 로 두면 모르는 refresh token 도 받아주므로 다음 갱신 주기(최대 19분)에 스스로 복구된다.
+      # 토큰 재사용 거절 동작을 검증하고 싶을 때만 false 로 바꾼다.
+      - MOCK_OAUTH_ACCEPT_UNKNOWN_REFRESH=true
