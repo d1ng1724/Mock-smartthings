@@ -3,13 +3,17 @@ services:
     build: .
     container_name: mock-smartthings
     ports:
-      - "8080:8080"
+      # 관리 프로그램이 8080 을 쓰므로 목은 8081.
+      - "8081:8081"
     environment:
       # tick 한 번에 줄어드는 분. 크게 하면 사이클이 더 빨리 끝난다.
       - MOCK_MINUTES_PER_TICK=1
       - MOCK_TICK_MS=1000
       # 완료 상태를 몇 초 유지한 뒤 jobState 를 none 으로 되돌릴지
       - MOCK_FINISH_HOLD_SECONDS=30
+      # 명령을 받고 상태에 반영되기까지의 지연(ms). 0 이면 즉시 반영.
+      # 실기기와 비슷하게 하려면 2000~3000 정도를 준다.
+      - MOCK_COMMAND_DELAY_MS=0
       # lenient | strict
       - MOCK_TOKEN_VALIDATION=lenient
       - MOCK_OAUTH_EXPIRES_IN=3600
@@ -20,9 +24,9 @@ services:
   #   build: ../Washer-Backend-v2
   #   depends_on: [mock-smartthings]
   #   environment:
-  #     - SMARTTHINGS_API_URL=http://mock-smartthings:8080
-  #     - SMARTTHINGS_OAUTH_URL=http://mock-smartthings:8080/oauth/token
-  #     - SMARTTHINGS_AUTHORIZE_URL=http://mock-smartthings:8080/oauth/authorize
+  #     - SMARTTHINGS_API_URL=http://mock-smartthings:8081
+  #     - SMARTTHINGS_OAUTH_URL=http://mock-smartthings:8081/oauth/token
+  #     - SMARTTHINGS_AUTHORIZE_URL=http://mock-smartthings:8081/oauth/authorize
   #     - SMARTTHINGS_CLIENT_ID=mock-client
   #     - SMARTTHINGS_CLIENT_SECRET=mock-secret
-  #     - SMARTTHINGS_TUB_CLEAN_CYCLE=6C
+  #     - SMARTTHINGS_TUB_CLEAN_CYCLE=Course_82

@@ -82,6 +82,12 @@ public class DeviceController {
             description = """
                     실제 API 와 마찬가지로 **기기가 받아들이지 못하는 명령도 `ACCEPTED`** 로 응답하고
                     상태만 바뀌지 않는다. 원격 제어가 꺼진 기기는 전원 외의 명령을 무시한다.
+
+                    오프라인 기기(`POST /mock/devices/{id}/online?value=false`)에는 명령을 보낼 수 없어
+                    **409 ConflictError** 가 돌아온다. 상태 조회는 마지막으로 알려진 값을 계속 돌려준다.
+
+                    `mock.command-delay-ms` 를 0 보다 크게 두면 응답은 바로 오지만 상태 반영은
+                    그만큼 늦어진다(실기기와 동일).
                     """,
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
                     content = @Content(mediaType = "application/json", examples = {
@@ -107,6 +113,12 @@ public class DeviceController {
     public ResponseEntity<?> commands(@PathVariable String id, @RequestBody JsonNode body) {
         MockDevice d = store.get(id);
         if (d == null) return notFound();
+        if (!d.online) {
+            // 실기기가 연결이 끊긴 상태. 관리 프로그램은 /health 를 조회하지 않으므로
+            // 오프라인은 명령 실패로만 드러난다.
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiErrors.body("ConflictError", "Device is offline"));
+        }
 
         // { "commands": [...] } 형태와 그냥 [...] 배열 형태 둘 다 허용
         JsonNode arr = body.has("commands") ? body.get("commands") : body;

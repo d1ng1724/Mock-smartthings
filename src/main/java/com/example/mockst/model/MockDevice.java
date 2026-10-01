@@ -3,6 +3,9 @@ package com.example.mockst.model;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -25,7 +28,7 @@ public class MockDevice {
     public boolean switchOn = false;
     public String machineState = "stop";        // stop / run / pause
     public String jobState = IDLE_JOB;
-    public String cycle = DeviceType.DEFAULT_CYCLE;
+    public String cycle;                        // 기기 종류별 표준 코스로 시작한다
     public boolean remoteControlEnabled = true;
     public boolean online = true;
 
@@ -34,6 +37,17 @@ public class MockDevice {
     public Instant completionTime = truncSeconds();
     /** 완료(finish/finished) 상태로 들어간 시각. 일정 시간 뒤 jobState 가 none 으로 리셋된다. */
     public Instant finishedAt = null;
+
+    /**
+     * 아직 기기에 반영되지 않은 명령. 실기기는 명령을 받고 상태에 반영되기까지 몇 초가 걸리는데,
+     * {@code mock.command-delay-ms} 가 0 보다 크면 그 지연을 흉내 내려고 여기에 쌓아둔다.
+     * 통세척처럼 한 요청에 명령이 여러 개 오는 경우가 있어 순서를 지키는 큐를 쓴다.
+     */
+    public final Deque<PendingCommand> pending = new ArrayDeque<>();
+
+    /** 적용 예정 시각({@code applyAt})이 지나면 DeviceStore 의 tick 이 꺼내서 실행한다. */
+    public record PendingCommand(String capability, String command, List<Object> arguments, Instant applyAt) {
+    }
 
     // 속성별 마지막 변경 시각
     public Instant switchAt = truncMillis();
@@ -49,7 +63,8 @@ public class MockDevice {
         this.floor = floor;
         // 라벨에서 결정적으로 뽑아내므로 재시작해도 deviceId 가 유지된다.
         this.deviceId = UUID.nameUUIDFromBytes(label.getBytes(StandardCharsets.UTF_8)).toString();
-        this.totalTime = type.minutesOf(cycle);
+        this.cycle = type.defaultCycle();
+        this.totalTime = type.minutesOf(this.cycle);
     }
 
     public void setSwitchOn(boolean value) {

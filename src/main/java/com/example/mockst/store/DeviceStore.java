@@ -29,8 +29,18 @@ public class DeviceStore {
 
     private static final String LOCATION_ID = "0c1e6a5f-2b4d-4e7a-9f31-5c8d2a7b6e40";
 
+    @Value("${mock.tick-ms:1000}")
+    private int tickMs;
+
     @Value("${mock.minutes-per-tick:1}")
     private int minutesPerTick;
+
+    /**
+     * 명령을 받고 상태에 반영되기까지의 지연(ms). 실기기는 클라우드를 거치므로 즉시 반영되지 않는다.
+     * 0 이면 예전처럼 즉시 반영한다. 반영 시점은 tick 단위라 실제 지연은 tick-ms 만큼 더 길어질 수 있다.
+     */
+    @Value("${mock.command-delay-ms:0}")
+    private long commandDelayMs;
 
     /** 완료 상태(finish/finished)를 유지하는 시간(초). 이후 jobState 가 none 으로 돌아간다. */
     @Value("${mock.finish-hold-seconds:30}")
@@ -83,6 +93,8 @@ public class DeviceStore {
     }
 
     private void advance(MockDevice d, Instant now) {
+        drainPending(d, now);
+
         // 완료 상태를 일정 시간 유지한 뒤 none 으로 리셋한다(실기기와 같은 동작).
         if (d.finishedAt != null) {
             if (Duration.between(d.finishedAt, now).getSeconds() >= finishHoldSeconds) {
@@ -101,11 +113,36 @@ public class DeviceStore {
         if (d.remainingTime == 0) {
             d.setMachineState("stop");
             d.setJobState(d.type.doneJob);
-            d.completionTime = now.truncatedTo(ChronoUnit.SECONDS);
+            d.completionTime = completionAt(now, 0);
             d.finishedAt = now;
         } else {
             d.setJobState(d.type.phaseAt(d.totalTime - d.remainingTime, d.totalTime));
-            d.completionTime = now.plusSeconds(60L * d.remainingTime).truncatedTo(ChronoUnit.SECONDS);
+            d.completionTime = completionAt(now, d.remainingTime);
+        }
+    }
+
+    /**
+     * 남은 시간(기기 기준 분)을 실제 완료 예정 시각으로 환산한다.
+     *
+     * <p>
+     * 목은 시간을 가속해서 돌린다 — {@code tick-ms} 마다 {@code minutes-per-tick} 분씩 소모하므로
+     * 기기 기준 1분은 실제로 {@code tickMs / minutesPerTick} 밀리초다. 이걸 반영하지 않으면
+     * 기본 설정에서 60분 사이클이 60초 만에 끝나는데 completionTime 은 60분 뒤를 가리켜서,
+     * 관리 프로그램이 저장하는 완료 예정 시각·남은 시간·완료 알림 문구가 전부 60배 어긋난다.
+     *
+     * <p>
+     * {@code MOCK_TICK_MS=60000} 으로 두면 가속이 1배가 되어 실제 시간과 같아진다.
+     */
+    private Instant completionAt(Instant now, int remainingMinutes) {
+        int perTick = Math.max(1, minutesPerTick);
+        return now.plusMillis((long) remainingMinutes * tickMs / perTick).truncatedTo(ChronoUnit.SECONDS);
+    }
+
+    /** 적용 시각이 된 예약 명령을 순서대로 꺼내 반영한다. 호출자가 기기 락을 잡고 있어야 한다. */
+    private void drainPending(MockDevice d, Instant now) {
+        while (!d.pending.isEmpty() && !d.pending.peekFirst().applyAt().isAfter(now)) {
+            MockDevice.PendingCommand p = d.pending.pollFirst();
+            applyNow(d, p.capability(), p.command(), p.arguments());
         }
     }
 
@@ -118,41 +155,52 @@ public class DeviceStore {
      * ACCEPTED 이고, 상태만 바뀌지 않는다.
      */
     public void applyCommand(MockDevice d, String capability, String command, List<Object> args) {
+        synchronized (d) {
+            if (commandDelayMs > 0) {
+                // 실기기처럼 잠시 뒤에 반영한다. 명령 직후 상태를 확인하는 코드가 목에서만 통과하는 일을 막는다.
+                d.pending.addLast(new MockDevice.PendingCommand(capability, command, args,
+                        Instant.now().plusMillis(commandDelayMs)));
+                return;
+            }
+            applyNow(d, capability, command, args);
+        }
+    }
+
+    /** 명령을 실제로 기기 상태에 반영한다. 호출자가 기기 락을 잡고 있어야 한다. */
+    private void applyNow(MockDevice d, String capability, String command, List<Object> args) {
         String arg0 = (args != null && !args.isEmpty() && args.get(0) != null) ? String.valueOf(args.get(0)) : null;
 
-        synchronized (d) {
-            if ("switch".equals(capability)) {
-                if ("on".equals(command)) {
-                    d.setSwitchOn(true);
-                } else if ("off".equals(command)) {
-                    d.setSwitchOn(false);
-                    stop(d);
-                }
-                return;
+        if ("switch".equals(capability)) {
+            if ("on".equals(command)) {
+                d.setSwitchOn(true);
+            } else if ("off".equals(command)) {
+                d.setSwitchOn(false);
+                stop(d);
             }
+            return;
+        }
 
-            // 원격 제어가 꺼진 기기는 전원 외의 제어 명령을 무시한다(실기기와 동일).
-            if (!d.remoteControlEnabled) {
-                return;
-            }
+        // 원격 제어가 꺼진 기기는 전원 외의 제어 명령을 무시한다(실기기와 동일).
+        if (!d.remoteControlEnabled) {
+            return;
+        }
 
-            if (d.type.operatingCap.equals(capability) && "setMachineState".equals(command)) {
-                switch (arg0 == null ? "" : arg0) {
-                    case "run" -> run(d);
-                    case "pause" -> pause(d);
-                    case "stop" -> stop(d);
-                    default -> {
-                    }
+        if (d.type.operatingCap.equals(capability) && "setMachineState".equals(command)) {
+            switch (arg0 == null ? "" : arg0) {
+                case "run" -> run(d);
+                case "pause" -> pause(d);
+                case "stop" -> stop(d);
+                default -> {
                 }
-                return;
             }
+            return;
+        }
 
-            if (d.type.cycleCap.equals(capability) && d.type.setCycleCmd.equals(command) && arg0 != null) {
-                d.setCycle(arg0);
-                // 사이클을 바꾸면 다음에 run 할 때의 총 시간이 정해진다. 가동 중이면 적용하지 않는다.
-                if (!"run".equals(d.machineState)) {
-                    d.totalTime = d.type.minutesOf(arg0);
-                }
+        if (d.type.cycleCap.equals(capability) && d.type.setCycleCmd.equals(command) && arg0 != null) {
+            d.setCycle(arg0);
+            // 사이클을 바꾸면 다음에 run 할 때의 총 시간이 정해진다. 가동 중이면 적용하지 않는다.
+            if (!"run".equals(d.machineState)) {
+                d.totalTime = d.type.minutesOf(arg0);
             }
         }
     }
@@ -166,7 +214,7 @@ public class DeviceStore {
         }
         d.setMachineState("run");
         d.setJobState(d.type.phaseAt(d.totalTime - d.remainingTime, d.totalTime));
-        d.completionTime = Instant.now().plusSeconds(60L * d.remainingTime).truncatedTo(ChronoUnit.SECONDS);
+        d.completionTime = completionAt(Instant.now(), d.remainingTime);
     }
 
     private void pause(MockDevice d) {
@@ -180,7 +228,7 @@ public class DeviceStore {
         d.setJobState(MockDevice.IDLE_JOB);
         d.setRemainingTime(0);
         d.finishedAt = null;
-        d.completionTime = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        d.completionTime = completionAt(Instant.now(), 0);
     }
 
     // ---------------------------------------------------------------------

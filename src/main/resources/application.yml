@@ -1,5 +1,5 @@
 server:
-  port: ${PORT:8080}
+  port: ${PORT:8081}
 
 mock:
   # 상태 갱신 주기(ms). 이 주기마다 run 중인 기기의 남은시간이 줄어든다.
@@ -8,6 +8,9 @@ mock:
   minutes-per-tick: ${MOCK_MINUTES_PER_TICK:1}
   # 완료(finish/finished) 상태를 유지하는 시간(초). 이후 jobState 가 none 으로 돌아간다.
   finish-hold-seconds: ${MOCK_FINISH_HOLD_SECONDS:30}
+  # 명령을 받고 상태에 반영되기까지의 지연(ms). 실기기는 클라우드를 거쳐 몇 초 걸린다.
+  # 0 이면 즉시 반영. 반영 시점은 tick 단위라 실제 지연은 tick-ms 만큼 더 길어질 수 있다.
+  command-delay-ms: ${MOCK_COMMAND_DELAY_MS:0}
   # lenient: Authorization 헤더만 있으면 통과 / strict: 목이 발급한 토큰만 통과(만료되면 401)
   token-validation: ${MOCK_TOKEN_VALIDATION:lenient}
   oauth:
